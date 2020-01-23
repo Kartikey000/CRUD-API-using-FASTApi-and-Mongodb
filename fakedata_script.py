@@ -4,13 +4,6 @@ import json
 from random2 import randint
 fake = Faker()
 
-# create connection for the Mongo database
-# client = motor.motor_asyncio.AsyncIOMotorClient('localhost', 27017)
-#
-# db = client['employee']
-# collection = db['employee_data']
-
-
 #dictionary for the employee database
 finaldata=[]
 

@@ -5,13 +5,16 @@ import motor.motor_asyncio
 
 from typing import List
 
+#initializing the app
 app = FastAPI()
 
+#connection with DataBase
 client = motor.motor_asyncio.AsyncIOMotorClient('localhost', 27017)
 
 db = client['empdb']
 collection = db['empdata']
 
+#request serializers
 class Item(BaseModel):
     emp_id : int
     name : str
@@ -19,18 +22,55 @@ class Item(BaseModel):
     age : int
     country : str
 
+#response serializer
 class Res(BaseModel):
     name: str
     email: str
     age: int
     country: str
 
+#update serializer
 class Updatedata(BaseModel):
     name: str
     email: str
     age: int
     country: str
 
+#Pagination class
+class Custom_Pagination:
+    default_offset= 0
+    default_pagesize= 10
+
+    def __init__(self, page, offset):
+        self.page_no = page
+        self.offset = offset
+
+    async def count_doc(self):
+        return await db.empdata.count_documents({})
+
+    async def next(self):
+        doc_count = await self.count_doc()
+        if self.offset + self.default_pagesize < doc_count :
+            return True
+        else:
+            return False
+
+    def previous(self):
+        if self.offset <= 0 :
+            return False
+        else:
+            return True
+
+    async def pagination_Response(self):
+        dict={
+            "page_number": self.page_no,
+            "total_items": await self.count_doc(),
+            "link": {
+                "next": await self.next(),
+                "previous": self.previous(),
+            },
+        }
+        return dict
 
 @app.post("/create", response_model=List[Res])
 async def do_insertt(item:List[Item]):
@@ -41,8 +81,10 @@ async def do_insertt(item:List[Item]):
 
 @app.get("/retrieve/")
 async def do_find(pagenum:int=1,pagesize:int=10):
+    page = pagenum
+    offset = pagesize*(pagenum-1)
     arr=[]
-    async for document in db.empdata.find().skip(pagesize*(pagenum-1)).limit(pagesize):
+    async for document in db.empdata.find().skip(offset).limit(pagesize):
         dict={}
         dict["emp_id"] = document["emp_id"]
         dict["name"] = document["name"]
@@ -50,11 +92,12 @@ async def do_find(pagenum:int=1,pagesize:int=10):
         dict["age"] = document["age"]
         dict["country"] = document["country"]
         arr.append(dict)
-    if not arr:
-        return f"no more data"
-    else:
-        return {f"page number : {pagenum} {arr}"}
-
+    ob = Custom_Pagination(page,offset)
+    page_resp = await ob.pagination_Response()
+    respon = {}
+    respon["page"] = page_resp
+    respon["data"] = arr
+    return respon
 
 @app.get("/retrieve-one/{n}")
 async def do_find(n: int):
