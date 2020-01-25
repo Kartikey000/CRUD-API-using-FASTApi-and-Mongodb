@@ -2,14 +2,14 @@ from fastapi import FastAPI, Query, Path
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
 import motor.motor_asyncio
-
+import os
 from typing import List
-
+mongoconnection = os.environ.get("MONGO_CONNECTION","127.0.0.1")
 #initializing the app
 app = FastAPI()
 
 #connection with DataBase
-client = motor.motor_asyncio.AsyncIOMotorClient('localhost', 27017)
+client = motor.motor_asyncio.AsyncIOMotorClient(mongoconnection, 27017)
 
 db = client['empdb']
 collection = db['empdata']
@@ -76,15 +76,17 @@ class Custom_Pagination:
 async def do_insertt(item:List[Item]):
     update_item_encoded = jsonable_encoder(item)
     print(update_item_encoded)
-    result = await db.testdata.insert_many(update_item_encoded)
+    result = await db.empdata.insert_many(update_item_encoded)
     return item
 
 @app.get("/retrieve/")
 async def do_find(pagenum:int=1,pagesize:int=10):
     page = pagenum
     offset = pagesize*(pagenum-1)
+    connect_query = db.empdata.find().skip(offset).limit(pagesize)
     arr=[]
-    async for document in db.empdata.find().skip(offset).limit(pagesize):
+    print(connect_query)
+    async for document in connect_query:
         dict={}
         dict["emp_id"] = document["emp_id"]
         dict["name"] = document["name"]
@@ -92,8 +94,10 @@ async def do_find(pagenum:int=1,pagesize:int=10):
         dict["age"] = document["age"]
         dict["country"] = document["country"]
         arr.append(dict)
+        print(dict)
     ob = Custom_Pagination(page,offset)
     page_resp = await ob.pagination_Response()
+    print (arr)
     respon = {}
     respon["page"] = page_resp
     respon["data"] = arr
